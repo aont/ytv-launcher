@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YouTube TV Launcher</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input[type="text"] { width: min(900px, 100%); padding: 8px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    #log {
+      margin-top: 12px;
+      height: 380px;
+      border: 1px solid #ccc;
+      padding: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+      background: #fafafa;
+    }
+    .muted { color: #666; font-size: 12px; }
+    .err { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>YouTube TV Launcher</h1>
+
+  <div class="row">
+    <label for="url">YouTube URL:</label>
+    <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=..." />
+    <button id="sendBtn">Send</button>
+    <button id="clearBtn">Clear Log</button>
+  </div>
+
+  <div class="muted">
+    WebSocket: <span id="wsState">disconnected</span>
+  </div>
+
+  <div id="log"></div>
+
+<script>
+(() => {
+  const urlInput = document.getElementById("url");
+  const sendBtn = document.getElementById("sendBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const logEl = document.getElementById("log");
+  const wsStateEl = document.getElementById("wsState");
+
+  let ws = null;
+
+  function appendLog(line, isError=false) {
+    const div = document.createElement("div");
+    if (isError) div.className = "err";
+    div.textContent = line;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setState(s) {
+    wsStateEl.textContent = s;
+  }
+
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const wsUrl = `${proto}://${location.host}/ws`;
+    ws = new WebSocket(wsUrl);
+
+    setState("connecting");
+
+    ws.addEventListener("open", () => {
+      setState("connected");
+      appendLog(`[client] connected: ${wsUrl}`);
+    });
+
+    ws.addEventListener("close", () => {
+      setState("disconnected");
+      appendLog("[client] disconnected");
+      // Automatic reconnection can be added if needed
+    });
+
+    ws.addEventListener("error", () => {
+      appendLog("[client] websocket error", true);
+    });
+
+    ws.addEventListener("message", (ev) => {
+      let data;
+      try {
+        data = JSON.parse(ev.data);
+      } catch {
+        appendLog(`[server] ${ev.data}`);
+        return;
+      }
+
+      const type = data.type;
+      const msg = data.message ?? "";
+
+      if (type === "error") {
+        appendLog(`[server][error] ${msg}`, true);
+      } else if (type === "log") {
+        appendLog(`[server] ${msg}`);
+      } else if (type === "done") {
+        appendLog(`[server][done] ${msg}`);
+      } else if (type === "pong") {
+        appendLog(`[server][pong] ${msg}`);
+      } else {
+        appendLog(`[server][${type}] ${msg}`);
+      }
+    });
+  }
+
+  function sendUrl() {
+    const u = urlInput.value.trim();
+    if (!u) {
+      appendLog("[client] Please enter a URL.", true);
+      return;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      appendLog("[client] WebSocket is not connected. Please reload the page.", true);
+      return;
+    }
+    ws.send(JSON.stringify({ type: "open", url: u }));
+    appendLog(`[client] sent: ${u}`);
+  }
+
+  sendBtn.addEventListener("click", sendUrl);
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendUrl();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    logEl.textContent = "";
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>
