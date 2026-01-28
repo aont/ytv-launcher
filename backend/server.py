@@ -6,9 +6,7 @@ from urllib.parse import urlparse
 
 from aiohttp import web
 
-STATIC_DIR = "docs"
-CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", "*")
-
+CORS_ALLOWED_ORIGINS = "*"
 
 def get_cors_allow_origin(origin: str | None) -> str | None:
     if CORS_ALLOWED_ORIGINS == "*":
@@ -178,9 +176,6 @@ def create_app() -> web.Application:
 
     # WebSocket
     app.router.add_get("/ws", websocket_handler)
-
-    # Static file serving (index.html)
-    app.router.add_static("/", path=STATIC_DIR, show_index=True)
 
     return app
 
