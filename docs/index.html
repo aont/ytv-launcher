@@ -26,6 +26,12 @@
   <h1>YouTube TV Launcher</h1>
 
   <div class="row">
+    <label for="wsUrl">WebSocket URL:</label>
+    <input id="wsUrl" type="text" placeholder="ws://backend-host:8080/ws" />
+    <button id="connectBtn">Connect</button>
+  </div>
+
+  <div class="row">
     <label for="url">YouTube URL:</label>
     <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=..." />
     <button id="sendBtn">Send</button>
@@ -40,6 +46,8 @@
 
 <script>
 (() => {
+  const wsUrlInput = document.getElementById("wsUrl");
+  const connectBtn = document.getElementById("connectBtn");
   const urlInput = document.getElementById("url");
   const sendBtn = document.getElementById("sendBtn");
   const clearBtn = document.getElementById("clearBtn");
@@ -60,9 +68,20 @@
     wsStateEl.textContent = s;
   }
 
-  function connect() {
+  function defaultWsUrl() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl = `${proto}://${location.host}/ws`;
+    return `${proto}://${location.hostname}:8080/ws`;
+  }
+
+  function connect() {
+    const wsUrl = wsUrlInput.value.trim() || defaultWsUrl();
+    wsUrlInput.value = wsUrl;
+    localStorage.setItem("wsUrl", wsUrl);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close(1000, "reconnect");
+    }
+
     ws = new WebSocket(wsUrl);
 
     setState("connecting");
@@ -122,6 +141,11 @@
     appendLog(`[client] sent: ${u}`);
   }
 
+  connectBtn.addEventListener("click", connect);
+  wsUrlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") connect();
+  });
+
   sendBtn.addEventListener("click", sendUrl);
   urlInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") sendUrl();
@@ -131,6 +155,7 @@
     logEl.textContent = "";
   });
 
+  wsUrlInput.value = localStorage.getItem("wsUrl") || defaultWsUrl();
   connect();
 })();
 </script>

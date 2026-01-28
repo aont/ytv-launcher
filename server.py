@@ -1,11 +1,31 @@
 import asyncio
 import json
+import os
 import re
 from urllib.parse import urlparse
 
 from aiohttp import web
 
 STATIC_DIR = "docs"
+CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", "*")
+
+
+def get_cors_allow_origin(origin: str | None) -> str | None:
+    if CORS_ALLOWED_ORIGINS == "*":
+        return "*"
+    if not origin:
+        return None
+    allowed = {item.strip() for item in CORS_ALLOWED_ORIGINS.split(",") if item.strip()}
+    return origin if origin in allowed else None
+
+
+def apply_cors_headers(request: web.Request, response: web.StreamResponse) -> None:
+    allow_origin = get_cors_allow_origin(request.headers.get("Origin"))
+    if allow_origin:
+        response.headers["Access-Control-Allow-Origin"] = allow_origin
+        response.headers["Vary"] = "Origin"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
 
 def is_valid_youtube_url(url: str) -> bool:
     """
@@ -108,6 +128,7 @@ async def run_adb_intent(ws: web.WebSocketResponse, url: str):
 
 async def websocket_handler(request: web.Request):
     ws = web.WebSocketResponse(heartbeat=30)
+    apply_cors_headers(request, ws)
     await ws.prepare(request)
 
     await send(ws, "log", "WebSocket connected. Please send a YouTube URL.")
@@ -144,7 +165,16 @@ async def websocket_handler(request: web.Request):
 
 
 def create_app() -> web.Application:
-    app = web.Application()
+    @web.middleware
+    async def cors_middleware(request: web.Request, handler):
+        if request.method == "OPTIONS":
+            response = web.Response(status=204)
+        else:
+            response = await handler(request)
+        apply_cors_headers(request, response)
+        return response
+
+    app = web.Application(middlewares=[cors_middleware])
 
     # WebSocket
     app.router.add_get("/ws", websocket_handler)
