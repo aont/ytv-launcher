@@ -76,7 +76,7 @@
   function connect() {
     const wsUrl = wsUrlInput.value.trim() || defaultWsUrl();
     wsUrlInput.value = wsUrl;
-    localStorage.setItem("wsUrl", wsUrl);
+    localStorage.setItem("adbYtvWebui.wsUrl", wsUrl);
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.close(1000, "reconnect");
@@ -155,7 +155,7 @@
     logEl.textContent = "";
   });
 
-  wsUrlInput.value = localStorage.getItem("wsUrl") || defaultWsUrl();
+  wsUrlInput.value = localStorage.getItem("adbYtvWebui.wsUrl") || defaultWsUrl();
   connect();
 })();
 </script>
